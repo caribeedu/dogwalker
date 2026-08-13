@@ -1,15 +1,17 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { launchApp, closeApp } from './helpers';
+import type { ElectronApplication } from '@playwright/test';
 
 // Terminal lifecycle e2e: the palette spawns a real PTY node on the canvas.
 // Run against the built app: `npm run package` then `npm run test:e2e`.
 let app: ElectronApplication;
 
 test.afterEach(async () => {
-  await app?.close();
+  await closeApp(app);
 });
 
 test('creating a terminal from the palette adds a live terminal node', async () => {
-  app = await electron.launch({ args: ['.vite/build/main.js'] });
+  app = await launchApp();
   const page = await app.firstWindow();
   await expect(page.locator('.dw-rail')).toBeVisible({ timeout: 30_000 });
 

@@ -42,10 +42,12 @@ export default defineConfig({
         // 2026-08-13 baseline #1: statements 28.5 / branches 24.4 / funcs 25.3 / lines 29.1.
         // 2026-08-13 after Onda 1 (7 stores/managers tested): stmts 33.2 / br 27.9 / fn 29.3 / ln 34.2.
         // 2026-08-13 after Ondas 2+3 (broker 100%, presets, workspaceStore, renderer): stmts 44.6 / br 42.5 / fn 39.0 / ln 45.7.
-        statements: 41,
-        branches: 39,
-        functions: 36,
-        lines: 42,
+        // 2026-08-13 after Ondas 4-6 (e2e CI, icons/Panel/Composer/TerminalPalette,
+        // presetStore/skillInstall/fsService/gitService/ptyManager): stmts 51.2 / br 49.6 / fn 48.3 / ln 51.7.
+        statements: 48,
+        branches: 46,
+        functions: 45,
+        lines: 48,
       },
     },
     projects: [
