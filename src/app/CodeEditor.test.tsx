@@ -107,6 +107,27 @@ describe('CodeEditor', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('shows an error state when the file read rejects', async () => {
+    vi.mocked(window.dw.readFile).mockRejectedValue(new Error('ENOENT'));
+    renderEditor('/repo/missing.ts');
+    expect(await screen.findByText(/Could not read file/)).toBeInTheDocument();
+    expect(screen.getByText(/ENOENT/)).toBeInTheDocument();
+  });
+
+  it('shows a save error and keeps the dirty marker when the write rejects', async () => {
+    vi.mocked(window.dw.readFile).mockResolvedValue(CONTENT);
+    vi.mocked(window.dw.writeFile).mockRejectedValue(new Error('disk full'));
+    const { container } = renderEditor('/repo/src/App.tsx');
+    await act(async () => { await Promise.resolve(); });
+    await typeText(container, '\nfourth line');
+    expect(container.querySelector('.dw-editor-dot')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Could not save/)).toBeInTheDocument();
+    // The failed save must not clear the unsaved-changes marker.
+    expect(container.querySelector('.dw-editor-dot')).toBeInTheDocument();
+    expect(window.dw.writeFile).toHaveBeenCalledTimes(1);
+  });
+
   it('saves through window.dw.writeFile and shows a transient "saved" badge', async () => {
     vi.useFakeTimers();
     vi.mocked(window.dw.readFile).mockResolvedValue(CONTENT);
