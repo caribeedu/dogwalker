@@ -1,4 +1,6 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { launchApp, closeApp } from './helpers';
+import type { ElectronApplication } from '@playwright/test';
 
 // Agent-created portal e2e: a terminal running `dogwalker portal new <url>` over
 // the real broker materializes a portal (WebContentsView) as a canvas node.
@@ -10,11 +12,11 @@ import { test, expect, _electron as electron, type ElectronApplication } from '@
 let app: ElectronApplication;
 
 test.afterEach(async () => {
-  await app?.close();
+  await closeApp(app);
 });
 
 test('a terminal can create a portal over the CLI', async () => {
-  app = await electron.launch({ args: ['.vite/build/main.js'] });
+  app = await launchApp();
   const page = await app.firstWindow();
   await expect(page.locator('.dw-rail')).toBeVisible({ timeout: 30_000 });
 
