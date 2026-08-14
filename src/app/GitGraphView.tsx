@@ -24,17 +24,24 @@ function color(i: number): string {
 /** Commit history with branch lanes (PRODUCT.md §8), laid out by computeLanes. */
 export function GitGraphView({ cwd }: { cwd: string }) {
   const [rows, setRows] = useState<GraphRow[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
-    void window.dw.gitLog(cwd, 300).then((log: GitCommit[]) => {
-      if (!cancelled) setRows(computeLanes(log));
-    });
+    void window.dw
+      .gitLog(cwd, 300)
+      .then((log: GitCommit[]) => {
+        if (!cancelled) setRows(computeLanes(log));
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(`Could not load history: ${String(err)}`);
+      });
     return () => {
       cancelled = true;
     };
   }, [cwd]);
 
+  if (error) return <div className="dw-ft-error">{error}</div>;
   if (rows.length === 0) {
     return <div className="dw-ft-empty">No commits.</div>;
   }

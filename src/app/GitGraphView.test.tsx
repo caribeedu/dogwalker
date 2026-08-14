@@ -34,6 +34,13 @@ describe('GitGraphView', () => {
     expect(screen.getByText('No commits.')).toBeInTheDocument();
   });
 
+  it('shows an error state when the log request rejects', async () => {
+    vi.mocked(window.dw.gitLog).mockRejectedValue(new Error('repo gone'));
+    render(<GitGraphView cwd="/repo" />);
+    expect(await screen.findByText(/Could not load history/)).toBeInTheDocument();
+    expect(screen.getByText(/repo gone/)).toBeInTheDocument();
+  });
+
   it('renders a commit row with subject, author and short hash', async () => {
     vi.mocked(window.dw.gitLog).mockResolvedValue(LOG);
     render(<GitGraphView cwd="/repo" />);

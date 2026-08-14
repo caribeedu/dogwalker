@@ -109,6 +109,23 @@ describe('GitBranchMenu', () => {
     expect(result.className).toContain('err');
   });
 
+  it('surfaces a rejected git operation as an error result and clears busy', async () => {
+    vi.mocked(window.dw.gitCheckout).mockRejectedValue(new Error('boom'));
+    renderMenu();
+    fireEvent.click(await screen.findByRole('button', { name: /○ feature\/x/ }));
+    expect(await screen.findByText(/boom/)).toBeInTheDocument();
+    // The rejection is caught: no unhandled rejection, menu usable again.
+    expect(screen.getByRole('button', { name: /Fetch/ })).toBeEnabled();
+    expect(window.dw.gitCheckout).toHaveBeenCalledWith('/repo', 'feature/x');
+  });
+
+  it('shows an error when the branch list load rejects', async () => {
+    vi.mocked(window.dw.gitBranches).mockRejectedValue(new Error('repo gone'));
+    renderMenu();
+    expect(await screen.findByText(/Could not list branches/)).toBeInTheDocument();
+    expect(screen.getByText(/repo gone/)).toBeInTheDocument();
+  });
+
   it('falls back to "Failed." for an empty failed result', async () => {
     vi.mocked(window.dw.gitCheckout).mockResolvedValue({ ok: false, output: '' });
     renderMenu();

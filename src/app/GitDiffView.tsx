@@ -9,21 +9,31 @@ export function GitDiffView({ cwd, reloadKey }: { cwd: string; reloadKey: number
   const [files, setFiles] = useState<DiffFile[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void window.dw.gitDiff(cwd).then((diff) => {
-      if (cancelled) return;
-      setFiles(parseDiff(diff));
-      setLoading(false);
-    });
+    setError('');
+    void window.dw
+      .gitDiff(cwd)
+      .then((diff) => {
+        if (cancelled) return;
+        setFiles(parseDiff(diff));
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(`Could not load diff: ${String(err)}`);
+        setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [cwd, reloadKey]);
 
   if (loading) return <div className="dw-ft-empty">Loading diff…</div>;
+  if (error) return <div className="dw-ft-error">{error}</div>;
   if (files.length === 0) {
     return <div className="dw-ft-empty">No uncommitted changes.</div>;
   }

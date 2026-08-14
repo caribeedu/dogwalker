@@ -62,6 +62,13 @@ describe('GitDiffView', () => {
     expect(await screen.findByText('No uncommitted changes.')).toBeInTheDocument();
   });
 
+  it('shows an error state when the diff request rejects', async () => {
+    vi.mocked(window.dw.gitDiff).mockRejectedValue(new Error('not a repo'));
+    renderDiff();
+    expect(await screen.findByText(/Could not load diff/)).toBeInTheDocument();
+    expect(screen.getByText(/not a repo/)).toBeInTheDocument();
+  });
+
   it('collapses and expands a file on header click', async () => {
     vi.mocked(window.dw.gitDiff).mockResolvedValue(SAMPLE_DIFF);
     const { container } = renderDiff();
