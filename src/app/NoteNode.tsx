@@ -54,6 +54,10 @@ function NoteNodeInner({ id, data, selected }: NodeProps<NoteFlowNode>) {
   // link to its on-disk path so the formatted view renders it and a connected
   // agent reading the note can open the file.
   const onPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Capture the textarea before any await: React nulls `currentTarget` once
+    // the paste dispatch finishes, so reading it after the awaits below would
+    // throw a TypeError in runtime (e.g. when focus moved while saving).
+    const target = e.currentTarget;
     const file = Array.from(e.clipboardData.items)
       .find((it) => it.type.startsWith('image/'))
       ?.getAsFile();
@@ -65,7 +69,6 @@ function NoteNodeInner({ id, data, selected }: NodeProps<NoteFlowNode>) {
       file.name || 'paste.png',
       bytes,
     );
-    const target = e.currentTarget;
     const caret = target.selectionStart ?? content.length;
     const embed = `![image](${p})`;
     onEdit(content.slice(0, caret) + embed + content.slice(caret));
@@ -153,15 +156,17 @@ function NoteNodeInner({ id, data, selected }: NodeProps<NoteFlowNode>) {
 }
 
 /**
- * Renders a markdown image. Remote/`data:` URIs pass through; a local on-disk
- * path (how pasted images are stored) is read through main into a data URI,
- * since the sandboxed renderer can't load `file://` under the CSP.
+ * Renders a markdown image. Remote URLs pass through; a local on-disk path
+ * (how pasted images are stored) is read through main into a data URI, since
+ * the sandboxed renderer can't load `file://` under the CSP. `data:` URIs
+ * never arrive here: react-markdown v10 sanitizes them to '' before the
+ * component is rendered.
  */
 function NoteImage({ src, alt }: { src?: string; alt?: string }) {
   const [data, setData] = useState('');
   useEffect(() => {
     if (!src) return;
-    if (/^(https?:|data:)/.test(src)) {
+    if (/^(https?:)/.test(src)) {
       setData(src);
       return;
     }

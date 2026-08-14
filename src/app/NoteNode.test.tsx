@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import type { NodeProps } from '@xyflow/react';
 import type { NoteFlowNode } from './NoteNode';
 import { NoteNode } from './NoteNode';
@@ -200,10 +200,8 @@ describe('NoteNode', () => {
 
   it('stores a pasted image via saveNoteImage with the file name', async () => {
     vi.mocked(window.dw.readNote).mockResolvedValue('abc');
-    // The embed insertion after this call crashes in production: NoteNode.tsx:69
-    // reads `e.currentTarget` after the awaits, and React nulls currentTarget once
-    // dispatch completes — so the handler never reaches the `![image](...)` insert.
-    // Characterization: pin everything up to that latent bug (deferred v0.3 feature).
+    // The save stays pending here on purpose: the insert-at-caret behaviour
+    // after the save resolves is covered by the async paste test below.
     vi.mocked(window.dw.saveNoteImage).mockReturnValue(new Promise(() => {}));
     renderNote();
     await screen.findByText('abc');
@@ -216,6 +214,39 @@ describe('NoteNode', () => {
         'shot.png',
         new Uint8Array([1, 2, 3]),
       ),
+    );
+  });
+
+  it('inserts the embed at the caret after the async save, even if focus moved', async () => {
+    vi.mocked(window.dw.readNote).mockResolvedValue('abc');
+    let resolveSave!: (p: string) => void;
+    vi.mocked(window.dw.saveNoteImage).mockImplementation(
+      () => new Promise<string>((resolve) => { resolveSave = resolve; }),
+    );
+    renderNote();
+    await screen.findByText('abc');
+    fireEvent.click(screen.getByTitle('Show raw markdown'));
+    const ta = screen.getByRole('textbox') as HTMLTextAreaElement;
+    ta.setSelectionRange(1, 1); // caret between 'a' and 'bc'
+    fireEvent(ta, pasteEvent([{ type: 'image/png', getAsFile: () => fakeImageFile('shot.png') }]));
+    // The paste dispatch has finished while the image save is still pending —
+    // React has already nulled e.currentTarget and focus may have moved. The
+    // handler must have captured the textarea before its awaits (regression
+    // guard for the TypeError that read `e.currentTarget` after them).
+    fireEvent.blur(ta);
+    // saveNoteImage is called only after file.arrayBuffer() resolves (a
+    // microtask), so wait for the call before resolving the deferred save.
+    await waitFor(() => expect(window.dw.saveNoteImage).toHaveBeenCalled());
+    await act(async () => {
+      resolveSave('/notes/s1/paste.png');
+    });
+    await waitFor(() =>
+      expect(ta.value).toBe('a![image](/notes/s1/paste.png)bc'),
+    );
+    expect(window.dw.saveNoteImage).toHaveBeenCalledWith(
+      's1',
+      'shot.png',
+      new Uint8Array([1, 2, 3]),
     );
   });
 
