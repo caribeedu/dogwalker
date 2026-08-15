@@ -21,6 +21,29 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage
 
+  # Real Electron e2e (Playwright) on every PR: boots the built app under
+  # Xvfb and drives it end to end (app shell, terminal lifecycle, portals).
+  # The specs launch .vite/build/main.js, so the bundle must be built first.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # electron-forge package produces .vite/build/main.js (no installers).
+      - run: npm run package
+      # System libs for Chromium/Electron under Xvfb; no Playwright browsers
+      # are downloaded — Electron ships via npm.
+      - run: npx playwright install-deps chromium
+      # ELECTRON_ENABLE_LOGGING surfaces the app's stderr into the runner log,
+      # so a boot failure is diagnosable instead of a silent firstWindow timeout.
+      - run: xvfb-run -a npm run test:e2e
+        env:
+          ELECTRON_ENABLE_LOGGING: 1
+
   # Per-OS installers, built only when a v* tag is pushed. Each runner produces
   # its own OS's artifact (electron-forge runs only the host's makers) and
   # attaches it to the tag's GitHub Release.

@@ -1,4 +1,6 @@
-import { test, expect, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { launchApp, closeApp } from './helpers';
+import type { ElectronApplication } from '@playwright/test';
 
 // Smoke E2E: the real app boots and paints its shell. This is the pattern the
 // richer scenarios (broker `ask`/`contract`, Walker teams, floors, portals)
@@ -7,11 +9,11 @@ import { test, expect, _electron as electron, type ElectronApplication } from '@
 let app: ElectronApplication;
 
 test.afterEach(async () => {
-  await app?.close();
+  await closeApp(app);
 });
 
 test('the app boots and paints its shell', async () => {
-  app = await electron.launch({ args: ['.vite/build/main.js'] });
+  app = await launchApp();
   const window = await app.firstWindow();
   await expect(window.locator('.dw-rail')).toBeVisible({ timeout: 30_000 });
 });

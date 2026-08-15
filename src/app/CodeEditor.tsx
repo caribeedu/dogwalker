@@ -50,15 +50,22 @@ export function CodeEditor({ filePath, onClose, onSend, gotoLine }: Props) {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [hasSel, setHasSel] = useState(false);
+  const [error, setError] = useState('');
 
   const save = () => {
     const view = viewRef.current;
     if (!view) return true;
-    void window.dw.writeFile(filePath, view.state.doc.toString()).then(() => {
-      setDirty(false);
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 1200);
-    });
+    void window.dw
+      .writeFile(filePath, view.state.doc.toString())
+      .then(() => {
+        setDirty(false);
+        setSaved(true);
+        setError('');
+        window.setTimeout(() => setSaved(false), 1200);
+      })
+      .catch((err: unknown) => {
+        setError(`Could not save: ${String(err)}`);
+      });
     return true;
   };
   const saveRef = useRef(save);
@@ -67,34 +74,40 @@ export function CodeEditor({ filePath, onClose, onSend, gotoLine }: Props) {
   useEffect(() => {
     let cancelled = false;
     let view: EditorView | null = null;
-    void window.dw.readFile(filePath).then((content) => {
-      if (cancelled || !hostRef.current) return;
-      const state = EditorState.create({
-        doc: content,
-        extensions: [
-          basicSetup,
-          ...langFor(filePath),
-          oneDark,
-          keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => saveRef.current() }]),
-          EditorView.updateListener.of((u) => {
-            if (u.docChanged) setDirty(true);
-            if (u.selectionSet || u.docChanged) {
-              setHasSel(!u.state.selection.main.empty);
-            }
-          }),
-        ],
-      });
-      view = new EditorView({ state, parent: hostRef.current });
-      viewRef.current = view;
-      if (gotoLine && gotoLine >= 1 && gotoLine <= view.state.doc.lines) {
-        const line = view.state.doc.line(gotoLine);
-        view.dispatch({
-          selection: { anchor: line.from, head: line.to },
-          scrollIntoView: true,
+    setError('');
+    void window.dw
+      .readFile(filePath)
+      .then((content) => {
+        if (cancelled || !hostRef.current) return;
+        const state = EditorState.create({
+          doc: content,
+          extensions: [
+            basicSetup,
+            ...langFor(filePath),
+            oneDark,
+            keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => saveRef.current() }]),
+            EditorView.updateListener.of((u) => {
+              if (u.docChanged) setDirty(true);
+              if (u.selectionSet || u.docChanged) {
+                setHasSel(!u.state.selection.main.empty);
+              }
+            }),
+          ],
         });
-        view.focus();
-      }
-    });
+        view = new EditorView({ state, parent: hostRef.current });
+        viewRef.current = view;
+        if (gotoLine && gotoLine >= 1 && gotoLine <= view.state.doc.lines) {
+          const line = view.state.doc.line(gotoLine);
+          view.dispatch({
+            selection: { anchor: line.from, head: line.to },
+            scrollIntoView: true,
+          });
+          view.focus();
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(`Could not read file: ${String(err)}`);
+      });
     return () => {
       cancelled = true;
       view?.destroy();
@@ -137,6 +150,7 @@ export function CodeEditor({ filePath, onClose, onSend, gotoLine }: Props) {
           Save
         </button>
       </div>
+      {error && <div className="dw-ft-error">{error}</div>}
       <div ref={hostRef} className="dw-editor-host nowheel nodrag" />
     </div>
   );

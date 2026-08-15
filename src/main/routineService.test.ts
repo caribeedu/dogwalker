@@ -30,9 +30,19 @@ describe('RoutineService (integration, real PTY)', () => {
     await wait(3000);
   }, 30_000);
 
-  afterAll(() => {
+  afterAll(async () => {
     ptys?.kill(term);
-    fs.rmSync(dir, { recursive: true, force: true });
+    // The PTY's child shell may still hold cwd/fds on the dir when kill
+    // returns; a plain rmSync can race its teardown and throw ENOTEMPTY.
+    for (let i = 0; i < 5; i++) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+        return;
+      } catch {
+        if (i === 4) throw new Error('cleanup failed after retries');
+        await wait(300);
+      }
+    }
   });
 
   it('runs a &&-chained routine in order and returns to idle', async () => {

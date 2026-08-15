@@ -20,21 +20,40 @@ type PromptKind = 'commit' | 'branch' | null;
 export function GitBranchMenu({ cwd, status, onClose, onChanged }: Props) {
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [result, setResult] = useState<GitResult | null>(null);
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState<PromptKind>(null);
   const [draft, setDraft] = useState('');
   const [mergeMode, setMergeMode] = useState(false);
 
   useEffect(() => {
-    void window.dw.gitBranches(cwd).then(setBranches);
+    let cancelled = false;
+    void window.dw
+      .gitBranches(cwd)
+      .then((list) => {
+        if (cancelled) return;
+        setBranches(list);
+        setError('');
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(`Could not list branches: ${String(err)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [cwd, result]);
 
   const act = async (fn: () => Promise<GitResult>) => {
     setBusy(true);
-    const r = await fn();
-    setBusy(false);
-    setResult(r);
-    onChanged();
+    try {
+      const r = await fn();
+      setResult(r);
+      onChanged();
+    } catch (err) {
+      setResult({ ok: false, output: String(err) });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onBranchClick = (name: string) => {
@@ -144,6 +163,7 @@ export function GitBranchMenu({ cwd, status, onClose, onChanged }: Props) {
           {result.output || (result.ok ? 'Done.' : 'Failed.')}
         </div>
       )}
+      {error && <div className="dw-git-result err">{error}</div>}
 
       <button className="dw-git-menu-close" onClick={onClose} title="Close">
         ×
