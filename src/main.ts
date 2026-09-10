@@ -581,6 +581,15 @@ const createWindow = () => {
     broker = null;
   });
 
+  // Surface renderer load failures instead of a silent black window.
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (!isMainFrame || code === -3 /* ERR_ABORTED */) return;
+    dialog.showErrorBox(
+      'Dogwalker failed to load',
+      `${desc} (${code})\n${url}`,
+    );
+  });
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     const params = [
       process.env.DW_SMOKE ? 'smoke=1' : '',

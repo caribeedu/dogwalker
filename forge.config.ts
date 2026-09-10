@@ -133,7 +133,9 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      // node-pty (and its spawn-helper) live in app.asar.unpacked. Keeping
+      // OnlyLoadAppFromAsar would refuse those native loads at runtime.
+      [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
   ],
 };

@@ -78,7 +78,18 @@ Grab the installer for your OS from the [latest release](https://github.com/cari
 | macOS 13+ | `Dogwalker-<version>.dmg` |
 | Linux | `Dogwalker-<version>.AppImage`, or the `.deb` / `.rpm` |
 
-Unsigned for now: Windows SmartScreen ("More info → Run anyway") and macOS Gatekeeper (right-click → Open, or `xattr -dr com.apple.quarantine Dogwalker.app`) will warn on first launch. Code signing + notarization are tracked for a later release.
+Unsigned for now: Windows SmartScreen ("More info → Run anyway") and macOS
+Gatekeeper will warn on first launch. On recent macOS (Sequoia / macOS 15+),
+Gatekeeper often labels an unsigned download as **"damaged"** rather than
+"unidentified developer" — that is the quarantine flag, not a corrupt file.
+Clear it with:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Dogwalker.app
+```
+
+(`xattr -cr` on the `.app` also works.) Then open normally. Code signing +
+notarization are tracked for a later release.
 
 Packaged Windows/macOS builds **auto-update** from the latest release. Package-manager installs — Homebrew (macOS), Scoop (Windows), AUR (Linux) — are set up under [`packaging/`](packaging/); the `brew` / `scoop` / AUR commands land here once their taps are published.
 
