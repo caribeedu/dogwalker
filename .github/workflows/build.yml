@@ -49,12 +49,34 @@ jobs:
           name: dogwalker-${{ matrix.os }}
           path: out/make/**/*
           if-no-files-found: error
-      # Attach this OS's installers to the Release (each job appends to the same
-      # tag; the release body comes from CHANGELOG via the release, see below).
+      # Attach this OS's installers to the Release (each matrix OS appends).
+      # First job to finish creates the Release; body is the CHANGELOG section
+      # for this tag plus the standard download footer.
+      - name: Compose release notes from CHANGELOG
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VER" '
+            $0 == "## " ver {p=1; next}
+            p && /^## / {exit}
+            p {print}
+          ' docs/CHANGELOG.md | sed '/./,$!d' > /tmp/changes.md
+          {
+            echo "**Dogwalker ${VER}.**"
+            echo
+            cat /tmp/changes.md
+            echo
+            echo "---"
+            echo
+            echo "📦 Download the installer for your platform below — **macOS**, **Windows**, **Linux**. Installers are unsigned for now, so expect a first-launch Gatekeeper/SmartScreen prompt."
+            echo "📖 Full history: [CHANGELOG](https://github.com/caribeedu/dogwalker/blob/main/docs/CHANGELOG.md)"
+          } > release-notes.md
       - name: Attach installers to the Release
         uses: softprops/action-gh-release@v2
         with:
           files: out/make/**/*
+          body_path: release-notes.md
           fail_on_unmatched_files: true
 
   # Once every OS's installers are on the Release, bump the package-manager
