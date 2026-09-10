@@ -3,6 +3,17 @@
 All notable changes, newest first. Dogwalker is a free, local, cross-platform
 canvas for AI coding agents.
 
+## 1.5.3
+
+- Fix: packaged builds no longer show a black/blank window. Vite was emitting
+  `crossorigin` on the renderer script and stylesheet; under Electron's
+  `file://`/`asar` load that becomes a CORS fetch with no ACAO response, so the
+  UI bundle never ran. Packaging also leaves `OnlyLoadAppFromAsar` off so the
+  unpacked `node-pty` native addon can load.
+- Docs: macOS Gatekeeper on recent OS versions reports an unsigned download as
+  "damaged" — clarified in the README (clear quarantine with `xattr`, same as
+  before).
+
 ## 1.5.2
 
 - Fix: packaged builds no longer crash on first launch with

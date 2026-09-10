@@ -26,6 +26,7 @@ The path from empty repo to public release, one version at a time. Each version 
 | [v1.5.0](#v150--universal---json--codemirror-schema-editor) | Universal --json & CodeMirror schema editor | Every CLI verb speaks `--json`; contracts edit their schema in a linted CodeMirror |
 | [v1.5.1](#v151--design-system-polish) | Design-system polish | Themed scrollbars/checkboxes, dev palette placement, README badges |
 | [v1.5.2](#v152--distribution-automation) | Distribution automation | The tag CD auto-bumps the Homebrew, Scoop and AUR channels |
+| [v1.5.3](#v153--packaged-ui-load--gatekeeper-docs) | Packaged UI load & Gatekeeper docs | Packaged app paints its UI; macOS "damaged" quarantine is documented |
 
 ---
 
@@ -585,6 +586,22 @@ Wire the package-manager channels into the tag-based CD.
 **Exit criteria**
 - A `v*` tag with the secrets configured updates all three channels to the new
   version with correct checksums; without them, the release is unaffected.
+
+---
+
+## v1.5.3 — Packaged UI load & Gatekeeper docs
+
+Hotfix for the first public packaged builds.
+
+- **Black screen.** Strip Vite's `crossorigin` from the packaged renderer HTML and
+  keep `OnlyLoadAppFromAsar` off so `file://`/`asar` loads the UI bundle and the
+  unpacked `node-pty` native addon.
+- **Gatekeeper wording.** Document that recent macOS reports unsigned downloads as
+  "damaged" (quarantine), cleared with `xattr`.
+
+**Exit criteria**
+- A packaged `.app` / installer paints the canvas UI after clearing quarantine.
+- README matches the Gatekeeper dialog users actually see.
 
 ---
 
