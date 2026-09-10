@@ -5,6 +5,11 @@ canvas for AI coding agents.
 
 ## 1.5.2
 
+- Fix: packaged builds no longer crash on first launch with
+  `Cannot find module 'node-pty'`. Vite leaves `node-pty` external (it is a
+  native addon), and the Forge Vite plugin does not ship `node_modules` into the
+  asar — packaging now copies `node-pty` in after the file copy and unpacks it
+  so `pty.node` and `spawn-helper` load correctly on macOS, Windows and Linux.
 - Release automation: the tag build now updates the Homebrew, Scoop and AUR
   package channels to the new version automatically (stamping the artifacts'
   checksums), once each channel's secret is configured. No user-facing change to
