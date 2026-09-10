@@ -17,7 +17,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // node-pty is a native module: resolved from node_modules at runtime,
-      // never bundled (forge's auto-unpack-natives handles packaging).
+      // never bundled. Forge's Vite plugin omits node_modules from the asar, so
+      // forge.config.ts packageAfterCopy copies it in and asar.unpack +
+      // auto-unpack-natives keep pty.node / spawn-helper outside the archive.
       external: ['node-pty'],
     },
   },
