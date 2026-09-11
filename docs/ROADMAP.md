@@ -28,6 +28,7 @@ The path from empty repo to public release, one version at a time. Each version 
 | [v1.5.2](#v152--distribution-automation) | Distribution automation | The tag CD auto-bumps the Homebrew, Scoop and AUR channels |
 | [v1.5.3](#v153--packaged-ui-load--gatekeeper-docs) | Packaged UI load & Gatekeeper docs | Packaged app paints its UI; macOS "damaged" quarantine is documented |
 | [v1.5.4](#v154--pty-spawn-helper--renderer-protocol) | PTY spawn-helper, renderer protocol & macOS name | Local/packaged PTY spawn works; packaged UI loads; macOS shows Dogwalker |
+| [v1.5.5](#v155--packaged-shim-copy) | Packaged shim copy | Packaged app reaches loadURL; CLI shim is present in the asar |
 
 ---
 
@@ -622,6 +623,24 @@ Hotfix for local spawn, the still-black packaged window, and branding polish.
 - `npm start` can spawn a shell node without `posix_spawnp failed`.
 - A packaged build paints the UI; `DOGWALKER_DEBUG=1` opens DevTools on the binary.
 - Packaged macOS app shows **Dogwalker** in the menu bar / Dock, not `dogwalker`.
+
+---
+
+## v1.5.5 — Packaged shim copy
+
+Hotfix for the remaining packaged black screen: the CLI shim never made it
+into the asar.
+
+- **Vite pack ignore.** Forge's Vite plugin only packs `/.vite`. Copy
+  `src/shim/shim.mjs` (and `skills/dogwalker`) into the asar in
+  `packageAfterCopy`.
+- **Asar-safe copy.** Replace `fs.copyFileSync` with read+write; `copyFileSync`
+  from an asar path can hang with no throw, stalling before `loadURL`.
+
+**Exit criteria**
+- Packaged app reaches `loadURL` (no hang in `createShimDir`).
+- `<userData>/shim/shim.mjs` exists after launch; `dogwalker` is on PATH inside a
+  canvas terminal.
 
 ---
 
