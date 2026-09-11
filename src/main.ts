@@ -26,6 +26,12 @@ import { HookService } from './main/hookService';
 import { AgentDocsSync } from './main/agentDocsSync';
 import { RoutineService } from './main/routineService';
 import { runPortalCli, runPortalLink } from './main/portalIntegration';
+import { ensureNodePtyHelpersExecutable } from './main/ensureNodePtyHelpers';
+import {
+  attachRendererProtocol,
+  registerRendererSchemePrivileges,
+  rendererIndexURL,
+} from './main/rendererProtocol';
 import type { AppSettings } from './shared/ipc';
 import type {
   FloorRecord,
@@ -36,10 +42,16 @@ import type {
   WorkspaceLayout,
 } from './shared/ipc';
 
+// Privileged scheme registration must run before the app is ready.
+registerRendererSchemePrivileges();
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// node-pty spawn-helper often lacks +x after npm install → posix_spawnp failed.
+ensureNodePtyHelpersExecutable();
 
 let ptys: PtyManager | null = null;
 let broker: Broker | null = null;
@@ -590,6 +602,14 @@ const createWindow = () => {
     );
   });
 
+  // Packaged builds have no application menu DevTools accelerator by default.
+  // DOGWALKER_DEBUG=1 opens DevTools and keeps console-message → stdout relay.
+  if (process.env.DOGWALKER_DEBUG === '1' || !app.isPackaged) {
+    if (process.env.DOGWALKER_DEBUG === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
+  }
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     const params = [
       process.env.DW_SMOKE ? 'smoke=1' : '',
@@ -620,11 +640,12 @@ const createWindow = () => {
       .join('&');
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL + (params ? `?${params}` : ''));
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    // Prefer dogwalker:// over loadFile: ES modules from file:// inside asar
+    // often fail silently (black window, no DevTools, no stderr).
+    const rendererRoot = path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`);
+    attachRendererProtocol(rendererRoot);
+    void mainWindow.loadURL(rendererIndexURL());
   }
-
 
 
 

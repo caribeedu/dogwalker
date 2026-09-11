@@ -100,8 +100,17 @@ Packaged Windows/macOS builds **auto-update** from the latest release. Package-m
 ```bash
 git clone https://github.com/caribeedu/dogwalker
 cd dogwalker
-npm install
+npm install   # postinstall chmods node-pty's spawn-helper (+x)
 npm start
+```
+
+If a terminal node fails with `posix_spawnp failed` after a partial install, run
+`node ./scripts/ensure-node-pty-helpers.mjs` (or re-run `npm install`).
+
+To debug a **packaged** build from Terminal (opens DevTools):
+
+```bash
+DOGWALKER_DEBUG=1 /Applications/Dogwalker.app/Contents/MacOS/dogwalker
 ```
 
 Build your own installers with `npm run make` (produces your current OS's artifact under `out/make/`).

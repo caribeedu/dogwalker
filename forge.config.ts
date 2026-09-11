@@ -23,6 +23,38 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
  */
 const EXTERNAL_NATIVE_MODULES = ['node-pty'] as const;
 
+/**
+ * Patch node-pty's unixTerminal.js so helperPath rewriting does not turn
+ * `app.asar.unpacked/...` into `app.asar.unpacked.unpacked/...`.
+ */
+async function patchNodePtyUnixTerminal(nodePtyDest: string): Promise<void> {
+  const unixPath = path.join(nodePtyDest, 'lib', 'unixTerminal.js');
+  if (!(await fs.pathExists(unixPath))) return;
+  let src = await fs.readFile(unixPath, 'utf8');
+  if (src.includes("indexOf('app.asar.unpacked')")) return;
+
+  const needle =
+    "helperPath = helperPath.replace('app.asar', 'app.asar.unpacked');";
+  const replacement =
+    "if (helperPath.indexOf('app.asar.unpacked') === -1) " +
+    "helperPath = helperPath.replace('app.asar', 'app.asar.unpacked');";
+  if (!src.includes(needle)) {
+    throw new Error(
+      'node-pty unixTerminal.js helperPath rewrite not found — update packaging patch',
+    );
+  }
+  src = src.replace(needle, replacement);
+
+  const needle2 =
+    "helperPath = helperPath.replace('node_modules.asar', 'node_modules.asar.unpacked');";
+  const replacement2 =
+    "if (helperPath.indexOf('node_modules.asar.unpacked') === -1) " +
+    "helperPath = helperPath.replace('node_modules.asar', 'node_modules.asar.unpacked');";
+  if (src.includes(needle2)) src = src.replace(needle2, replacement2);
+
+  await fs.writeFile(unixPath, src);
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     // Unpack the whole node-pty tree (not just `*.node`): unixTerminal resolves
@@ -81,6 +113,10 @@ const config: ForgeConfig = {
         }
         const releaseHelper = path.join(dest, 'build', 'Release', 'spawn-helper');
         if (await fs.pathExists(releaseHelper)) await fs.chmod(releaseHelper, 0o755);
+
+        // Guard against app.asar.unpacked → app.asar.unpacked.unpacked when the
+        // native dir is already a real unpacked path (whole tree unpacked above).
+        await patchNodePtyUnixTerminal(dest);
       }
     },
   },
