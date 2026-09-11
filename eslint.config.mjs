@@ -16,6 +16,7 @@ export default tseslint.config(
       'forge.config.ts',
       'vite.*.config.ts',
       'eslint.config.mjs',
+      'scripts/**',
     ],
   },
   js.configs.recommended,

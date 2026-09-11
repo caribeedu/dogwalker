@@ -3,6 +3,24 @@
 All notable changes, newest first. Dogwalker is a free, local, cross-platform
 canvas for AI coding agents.
 
+## 1.5.4
+
+- Fix: `npm start` no longer fails PTY spawn with `posix_spawnp failed`. npm
+  often installs node-pty's `spawn-helper` without the executable bit; a
+  `postinstall` (and boot-time) chmod restores `+x`. Packaged builds also patch
+  node-pty so an already-unpacked `app.asar.unpacked` path is not rewritten into
+  `app.asar.unpacked.unpacked`.
+- Fix: packaged app serves the renderer over a privileged `dogwalker://` scheme
+  instead of `file://` inside the asar — ES modules were failing silently and
+  leaving a black window with no DevTools. Set `DOGWALKER_DEBUG=1` when launching
+  the binary to open DevTools detached.
+- Fix: quitting no longer shows "A JavaScript error occurred in the main process"
+  (`TypeError: Object has been destroyed`). Closing the window kills PTYs whose
+  exit/data callbacks were still calling `WebContents.send` on a destroyed
+  renderer; those sends are now guarded and listeners are disposed before kill.
+- Fix: macOS shows the branded name **Dogwalker** (menu bar / Dock / About), not
+  the lowercase npm/`executableName` id `dogwalker`.
+
 ## 1.5.3
 
 - Fix: packaged builds no longer show a black/blank window. Vite was emitting

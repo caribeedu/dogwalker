@@ -1,7 +1,7 @@
 {
   "name": "dogwalker",
   "productName": "Dogwalker",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Walk all your agents at once — an infinite canvas for AI coding agents.",
   "main": ".vite/build/main.js",
   "private": true,
@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "postinstall": "node ./scripts/ensure-node-pty-helpers.mjs"
   },
   "keywords": [],
   "author": {

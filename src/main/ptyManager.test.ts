@@ -101,3 +101,44 @@ describe('PtyManager spawn-time role ordering', () => {
     expect(text).toContain('Dogwalker role was updated');
   }, 10_000);
 });
+
+describe('PtyManager quit vs destroyed WebContents', () => {
+  it('killAll does not throw or send when the renderer is already gone', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-pty-quit-'));
+    const graph = new GraphStore();
+    let destroyed = false;
+    const sent: string[] = [];
+    const webContents = {
+      send: (channel: string) => {
+        if (destroyed) throw new Error('Object has been destroyed');
+        sent.push(channel);
+      },
+      isDestroyed: () => destroyed,
+    } as unknown as ConstructorParameters<typeof PtyManager>[0];
+
+    const ptys = new PtyManager(webContents, graph, { socketPath: dir, shimDir: dir });
+    ptys.spawn({
+      preset: 'shell',
+      name: 't',
+      stableId: 't',
+      cols: 80,
+      rows: 24,
+      workspaceId: 'ws',
+      floorName: 'ground',
+      cwd: dir,
+    });
+    await wait(100);
+    // Mimic BrowserWindow `closed`: contents die, then main kills PTYs.
+    destroyed = true;
+    expect(() => ptys.killAll()).not.toThrow();
+    await wait(300);
+    expect(sent.filter((c) => c === 'pty:exit')).toHaveLength(0);
+
+    await wait(100);
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      /* best-effort */
+    }
+  }, 10_000);
+});

@@ -27,6 +27,7 @@ The path from empty repo to public release, one version at a time. Each version 
 | [v1.5.1](#v151--design-system-polish) | Design-system polish | Themed scrollbars/checkboxes, dev palette placement, README badges |
 | [v1.5.2](#v152--distribution-automation) | Distribution automation | The tag CD auto-bumps the Homebrew, Scoop and AUR channels |
 | [v1.5.3](#v153--packaged-ui-load--gatekeeper-docs) | Packaged UI load & Gatekeeper docs | Packaged app paints its UI; macOS "damaged" quarantine is documented |
+| [v1.5.4](#v154--pty-spawn-helper--renderer-protocol) | PTY spawn-helper, renderer protocol & macOS name | Local/packaged PTY spawn works; packaged UI loads; macOS shows Dogwalker |
 
 ---
 
@@ -602,6 +603,25 @@ Hotfix for the first public packaged builds.
 **Exit criteria**
 - A packaged `.app` / installer paints the canvas UI after clearing quarantine.
 - README matches the Gatekeeper dialog users actually see.
+
+---
+
+## v1.5.4 — PTY spawn-helper, renderer protocol & macOS name
+
+Hotfix for local spawn, the still-black packaged window, and branding polish.
+
+- **`posix_spawnp failed`.** Ensure node-pty's `spawn-helper` is executable after
+  install (and at boot). Patch the packaged `unixTerminal.js` so asar unpack
+  rewriting cannot produce `app.asar.unpacked.unpacked`.
+- **Packaged UI protocol.** Load the Vite renderer via `dogwalker://` (privileged
+  custom scheme) instead of `file://`+asar. `DOGWALKER_DEBUG=1` opens DevTools.
+- **macOS display name.** Keep lowercase `executableName` for Linux AppImage, but
+  stamp `CFBundleDisplayName`/`CFBundleName` as Dogwalker and call `app.setName`.
+
+**Exit criteria**
+- `npm start` can spawn a shell node without `posix_spawnp failed`.
+- A packaged build paints the UI; `DOGWALKER_DEBUG=1` opens DevTools on the binary.
+- Packaged macOS app shows **Dogwalker** in the menu bar / Dock, not `dogwalker`.
 
 ---
 
