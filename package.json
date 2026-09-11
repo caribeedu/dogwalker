@@ -1,7 +1,7 @@
 {
   "name": "dogwalker",
   "productName": "Dogwalker",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Walk all your agents at once — an infinite canvas for AI coding agents.",
   "main": ".vite/build/main.js",
   "private": true,

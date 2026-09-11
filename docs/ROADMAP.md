@@ -28,6 +28,7 @@ The path from empty repo to public release, one version at a time. Each version 
 | [v1.5.2](#v152--distribution-automation) | Distribution automation | The tag CD auto-bumps the Homebrew, Scoop and AUR channels |
 | [v1.5.3](#v153--packaged-ui-load--gatekeeper-docs) | Packaged UI load & Gatekeeper docs | Packaged app paints its UI; macOS "damaged" quarantine is documented |
 | [v1.5.4](#v154--pty-spawn-helper--renderer-protocol) | PTY spawn-helper, renderer protocol & macOS name | Local/packaged PTY spawn works; packaged UI loads; macOS shows Dogwalker |
+| [v1.5.5](#v155--asar-safe-shim-copy) | Asar-safe shim copy | Packaged app reaches loadURL (no hang in createShimDir) |
 
 ---
 
@@ -622,6 +623,19 @@ Hotfix for local spawn, the still-black packaged window, and branding polish.
 - `npm start` can spawn a shell node without `posix_spawnp failed`.
 - A packaged build paints the UI; `DOGWALKER_DEBUG=1` opens DevTools on the binary.
 - Packaged macOS app shows **Dogwalker** in the menu bar / Dock, not `dogwalker`.
+
+---
+
+## v1.5.5 — Asar-safe shim copy
+
+Hotfix for the packaged black screen: `createShimDir` stalled on
+`fs.copyFileSync` from an asar source.
+
+- **Asar-safe copy.** Replace `fs.copyFileSync` with read+write so the copy
+  always completes or throws before `loadURL`.
+
+**Exit criteria**
+- Packaged app reaches `loadURL` (no hang in `createShimDir`).
 
 ---
 

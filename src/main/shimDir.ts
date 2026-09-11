@@ -15,7 +15,10 @@ export function createShimDir(): string {
 
   const shimSrc = path.join(app.getAppPath(), 'src', 'shim', 'shim.mjs');
   const shimDest = path.join(dir, 'shim.mjs');
-  fs.copyFileSync(shimSrc, shimDest);
+  // copyFileSync can hang with no throw on asar sources (packaged app), which
+  // stalls createWindow before loadURL and leaves a black window. read+write
+  // uses the asar-aware fs paths and always completes or throws.
+  fs.writeFileSync(shimDest, fs.readFileSync(shimSrc));
 
   if (process.platform === 'win32') {
     const cmd = `@echo off\r\nnode "${shimDest}" %*\r\n`;
