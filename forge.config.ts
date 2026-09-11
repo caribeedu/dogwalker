@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import fs from 'fs-extra';
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
@@ -11,6 +12,41 @@ import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-nati
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+const require = createRequire(import.meta.url);
+const plist = require('plist') as {
+  parse: (xml: string) => Record<string, unknown>;
+  build: (obj: Record<string, unknown>) => string;
+};
+
+/** Human-facing macOS name; keep distinct from lowercase `executableName`. */
+const APP_DISPLAY_NAME = 'Dogwalker';
+
+/**
+ * electron-packager sets CFBundleDisplayName from `executableName` (needed
+ * lowercase for the Linux AppImage bin). Restore the branded display name so
+ * Dock / Finder / menu bar show "Dogwalker", not "dogwalker".
+ */
+async function fixMacOsDisplayName(outputPath: string): Promise<void> {
+  let appPath = outputPath;
+  if (!appPath.endsWith('.app')) {
+    const entries = await fs.readdir(appPath);
+    const found = entries.find((e) => e.endsWith('.app'));
+    if (!found) {
+      throw new Error(`postPackage: no .app under ${outputPath}`);
+    }
+    appPath = path.join(appPath, found);
+  }
+  const infoPath = path.join(appPath, 'Contents', 'Info.plist');
+  if (!(await fs.pathExists(infoPath))) {
+    throw new Error(`postPackage: missing Info.plist at ${infoPath}`);
+  }
+  const parsed = plist.parse(await fs.readFile(infoPath, 'utf8'));
+  parsed.CFBundleDisplayName = APP_DISPLAY_NAME;
+  parsed.CFBundleName = APP_DISPLAY_NAME;
+  // CFBundleExecutable must stay the lowercase binary name (`dogwalker`).
+  await fs.writeFile(infoPath, plist.build(parsed));
+}
 
 /**
  * Native modules listed in Vite's `rollupOptions.external` are resolved from
@@ -57,6 +93,7 @@ async function patchNodePtyUnixTerminal(nodePtyDest: string): Promise<void> {
 
 const config: ForgeConfig = {
   packagerConfig: {
+    name: APP_DISPLAY_NAME,
     // Unpack the whole node-pty tree (not just `*.node`): unixTerminal resolves
     // `spawn-helper` next to the native addon and rewrites `app.asar` →
     // `app.asar.unpacked`. Auto-unpack-natives alone only matches `*.node`.
@@ -66,6 +103,8 @@ const config: ForgeConfig = {
     // Force a stable lowercase executable name on every OS so the AppImage
     // maker's `bin` matches the packaged binary (it defaults to the capitalized
     // product name otherwise → "Could not find executable 'dogwalker'").
+    // Note: packager also copies this into CFBundleDisplayName — fixed in
+    // postPackage for darwin (see fixMacOsDisplayName).
     executableName: 'dogwalker',
     // App/program icon (from assets/logo.svg via tools/gen-icons.mjs). Packager
     // appends .ico on Windows and .icns on macOS; Linux icons come from the makers.
@@ -80,6 +119,10 @@ const config: ForgeConfig = {
   // install-time `build/Release` artifact, which N-API keeps Electron-compatible.
   rebuildConfig: { onlyModules: [] },
   hooks: {
+    async postPackage(_forgeConfig, { platform, outputPaths }) {
+      if (platform !== 'darwin') return;
+      for (const out of outputPaths) await fixMacOsDisplayName(out);
+    },
     async packageAfterCopy(_forgeConfig, buildPath) {
       const sourceRoot = path.resolve(process.cwd(), 'node_modules');
       const destRoot = path.join(buildPath, 'node_modules');

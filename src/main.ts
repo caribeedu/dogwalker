@@ -684,6 +684,12 @@ ipcMain.handle('perf:metrics', (): ProcessMetric[] =>
   })),
 );
 
+// package.json `name` is the npm id ("dogwalker"); productName is "Dogwalker".
+// Electron's macOS About/Hide/Quit labels use app.getName(), which follows
+// `name` unless we set it — and packager also stamps CFBundleDisplayName from
+// the lowercase executableName (fixed in forge postPackage).
+app.setName('Dogwalker');
+
 // Windows shows an app's notifications under its AppUserModelID; set a stable
 // one so toasts are attributed to Dogwalker (not "electron.app.…").
 if (process.platform === 'win32') app.setAppUserModelId('com.dogwalker.app');

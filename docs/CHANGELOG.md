@@ -18,6 +18,8 @@ canvas for AI coding agents.
   (`TypeError: Object has been destroyed`). Closing the window kills PTYs whose
   exit/data callbacks were still calling `WebContents.send` on a destroyed
   renderer; those sends are now guarded and listeners are disposed before kill.
+- Fix: macOS shows the branded name **Dogwalker** (menu bar / Dock / About), not
+  the lowercase npm/`executableName` id `dogwalker`.
 
 ## 1.5.3
 
