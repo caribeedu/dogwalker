@@ -14,6 +14,10 @@ canvas for AI coding agents.
   instead of `file://` inside the asar — ES modules were failing silently and
   leaving a black window with no DevTools. Set `DOGWALKER_DEBUG=1` when launching
   the binary to open DevTools detached.
+- Fix: quitting no longer shows "A JavaScript error occurred in the main process"
+  (`TypeError: Object has been destroyed`). Closing the window kills PTYs whose
+  exit/data callbacks were still calling `WebContents.send` on a destroyed
+  renderer; those sends are now guarded and listeners are disposed before kill.
 
 ## 1.5.3
 

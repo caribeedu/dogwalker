@@ -43,6 +43,9 @@ interface Entry {
   autoexecPending: boolean;
   /** Role file to inject once the preset command's agent has started (spawn ordering). */
   pendingRoleFile: string | null;
+  /** node-pty listener handles — disposed in kill() so exit/data cannot race a dead window. */
+  dataSub: { dispose(): void };
+  exitSub: { dispose(): void };
 }
 
 interface PtyEnv {
@@ -83,6 +86,19 @@ export class PtyManager {
     private resolvePreset: (id: PresetId) => string | null = presetCommand,
   ) {}
 
+  /**
+   * IPC to the renderer. Quit/`closed` destroys WebContents while PTY exit/data
+   * callbacks may still fire — never throw TypeError: Object has been destroyed.
+   */
+  private safeSend(channel: string, ...args: unknown[]): void {
+    if (this.target.isDestroyed()) return;
+    try {
+      this.target.send(channel, ...args);
+    } catch {
+      /* window gone between isDestroyed and send */
+    }
+  }
+
   spawn(opts: SpawnOptions): { id: string } {
     const id = `t${this.nextId++}`;
     const shell = defaultShell();
@@ -120,15 +136,16 @@ export class PtyManager {
       return true;
     });
 
-    proc.onData((data) => {
+    const dataSub = proc.onData((data) => {
       mirror.write(data);
       this.pending.set(id, (this.pending.get(id) ?? '') + data);
       this.scheduleFlush();
       this.onOutput(id);
     });
 
-    proc.onExit(() => {
-      this.target.send('pty:exit', id);
+    const exitSub = proc.onExit(() => {
+      // Natural shell exit (not kill()): notify the renderer if it is still alive.
+      this.safeSend('pty:exit', id);
       this.graph.removeNode(id);
     });
 
@@ -151,6 +168,8 @@ export class PtyManager {
       memoryLimitMB: opts.memoryLimitMB ?? 0,
       autoexecPending: false,
       pendingRoleFile: null,
+      dataSub,
+      exitSub,
     });
     this.syncMemoryPoller();
     this.graph.addNode(id, opts.name, 'terminal', opts.preset);
@@ -235,7 +254,7 @@ export class PtyManager {
     const e = this.entries.get(id);
     if (!e || e.attention === value) return;
     e.attention = value;
-    if (!this.target.isDestroyed()) this.target.send('pty:attention', { id, value });
+    this.safeSend('pty:attention', { id, value });
     if (value && e.quietWaiters.length) {
       const waiters = e.quietWaiters;
       e.quietWaiters = [];
@@ -307,15 +326,29 @@ export class PtyManager {
     const entry = this.entries.get(id);
     if (!entry) return;
     if (entry.quiesce) clearTimeout(entry.quiesce);
+    entry.quietWaiters = [];
+    // Drop listeners before kill so onExit/onData cannot race a destroyed window
+    // (app quit → BrowserWindow closed → killAll → PTY exit).
+    entry.dataSub.dispose();
+    entry.exitSub.dispose();
     this.entries.delete(id);
     this.pending.delete(id);
-    entry.proc.kill();
+    try {
+      entry.proc.kill();
+    } catch {
+      /* already dead */
+    }
     entry.mirror.dispose();
     this.graph.removeNode(id);
     this.syncMemoryPoller();
   }
 
   killAll(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.pending.clear();
     for (const id of [...this.entries.keys()]) this.kill(id);
   }
 
@@ -362,13 +395,13 @@ export class PtyManager {
     walkerId: string;
     workspaceId: string;
   }): void {
-    if (!this.target.isDestroyed()) this.target.send('terminal:recruited', e);
+    this.safeSend('terminal:recruited', e);
   }
   announceDismiss(id: string): void {
-    if (!this.target.isDestroyed()) this.target.send('terminal:dismissed', id);
+    this.safeSend('terminal:dismissed', id);
   }
   announceReassign(id: string, name: string): void {
-    if (!this.target.isDestroyed()) this.target.send('terminal:reassigned', { id, name });
+    this.safeSend('terminal:reassigned', { id, name });
   }
 
   /** OS pid of a terminal's shell (root of its process tree). */
@@ -451,10 +484,10 @@ export class PtyManager {
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
-      if (this.pending.size === 0 || this.target.isDestroyed()) return;
+      if (this.pending.size === 0) return;
       const batch: DataBatch = [...this.pending.entries()];
       this.pending.clear();
-      this.target.send('pty:data', batch);
+      this.safeSend('pty:data', batch);
     }, FLUSH_MS);
   }
 }
