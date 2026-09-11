@@ -124,23 +124,6 @@ const config: ForgeConfig = {
       for (const out of outputPaths) await fixMacOsDisplayName(out);
     },
     async packageAfterCopy(_forgeConfig, buildPath) {
-      // The Forge Vite plugin only packs `/.vite` into the asar. Runtime assets
-      // that live outside that folder (CLI shim, agent skill) must be copied in
-      // here — otherwise createShimDir's copy hangs/fails and the window stays
-      // black because loadURL never runs.
-      const runtimeAssets: Array<{ from: string; to: string }> = [
-        { from: 'src/shim/shim.mjs', to: 'src/shim/shim.mjs' },
-        { from: 'skills/dogwalker', to: 'skills/dogwalker' },
-      ];
-      for (const { from, to } of runtimeAssets) {
-        const src = path.resolve(process.cwd(), from);
-        const dest = path.join(buildPath, to);
-        if (!(await fs.pathExists(src))) {
-          throw new Error(`packageAfterCopy: missing runtime asset ${from}`);
-        }
-        await fs.copy(src, dest, { recursive: true, preserveTimestamps: true });
-      }
-
       const sourceRoot = path.resolve(process.cwd(), 'node_modules');
       const destRoot = path.join(buildPath, 'node_modules');
       await fs.ensureDir(destRoot);

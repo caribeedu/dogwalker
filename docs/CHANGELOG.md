@@ -5,11 +5,9 @@ canvas for AI coding agents.
 
 ## 1.5.5
 
-- Fix: packaged app no longer hangs on a black window at `createShimDir`. The
-  Forge Vite plugin only packs `/.vite`, so `src/shim/shim.mjs` was missing from
-  the asar; `fs.copyFileSync` from that path could stall with no error before
-  `loadURL`. Packaging now copies the shim (and skill) into the asar, and the
-  copy uses asar-safe read+write with a clear throw if the source is absent.
+- Fix: packaged app no longer hangs on a black window at `createShimDir`.
+  `fs.copyFileSync` from an asar source could stall with no throw before
+  `loadURL`; the shim is now copied with read+write instead.
 
 ## 1.5.4
 

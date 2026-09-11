@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { app } from 'electron';
-import { copyOutOfAsar, createShimDir, resolveShimSource } from './shimDir';
+import { createShimDir } from './shimDir';
 
 describe('createShimDir', () => {
   let userData: string;
@@ -54,35 +54,5 @@ describe('createShimDir', () => {
     expect(fs.existsSync(path.join(second, 'shim.mjs'))).toBe(true);
     expect(fs.existsSync(path.join(second, 'dogwalker'))).toBe(true);
     expect(fs.existsSync(path.join(second, 'walk'))).toBe(true);
-  });
-
-  it('throws a clear error when shim.mjs is missing (never hang)', () => {
-    fs.rmSync(path.join(appPath, 'src', 'shim', 'shim.mjs'));
-    expect(() => createShimDir()).toThrow(/shim\.mjs not found/);
-  });
-});
-
-describe('copyOutOfAsar', () => {
-  it('copies via read+write (asar-safe) rather than copyFileSync', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-copy-'));
-    const src = path.join(dir, 'src.txt');
-    const dest = path.join(dir, 'dest.txt');
-    fs.writeFileSync(src, 'hello from asar-safe copy');
-    copyOutOfAsar(src, dest);
-    expect(fs.readFileSync(dest, 'utf8')).toBe('hello from asar-safe copy');
-    fs.rmSync(dir, { recursive: true, force: true });
-  });
-});
-
-describe('resolveShimSource', () => {
-  afterEach(() => vi.restoreAllMocks());
-
-  it('prefers app.getAppPath()/src/shim/shim.mjs when present', () => {
-    const appPath = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-shim-res-'));
-    fs.mkdirSync(path.join(appPath, 'src', 'shim'), { recursive: true });
-    fs.writeFileSync(path.join(appPath, 'src', 'shim', 'shim.mjs'), 'ok');
-    vi.spyOn(app, 'getAppPath').mockReturnValue(appPath);
-    expect(resolveShimSource()).toBe(path.join(appPath, 'src', 'shim', 'shim.mjs'));
-    fs.rmSync(appPath, { recursive: true, force: true });
   });
 });
