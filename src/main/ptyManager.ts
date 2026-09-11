@@ -388,7 +388,14 @@ export class PtyManager {
   private syncMemoryPoller(): void {
     const wanted = [...this.entries.values()].some((e) => e.memoryLimitMB > 0);
     if (wanted && !this.memoryTimer) {
-      this.memoryTimer = setInterval(() => void this.checkMemory(), MEMORY_POLL_MS);
+      this.memoryTimer = setInterval(() => {
+        void this.checkMemory().catch((err: unknown) => {
+          // Defensive: the poller must never become an unhandled rejection
+          // source. Observability only — the limit enforcement stays in
+          // checkMemory's own paths.
+          console.error('[dw] memory check failed:', err);
+        });
+      }, MEMORY_POLL_MS);
     } else if (!wanted && this.memoryTimer) {
       clearInterval(this.memoryTimer);
       this.memoryTimer = null;

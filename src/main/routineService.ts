@@ -104,7 +104,14 @@ export class RoutineService {
     this.disarm(r.id);
     this.timers.set(
       r.id,
-      setInterval(() => void this.tick(r.id), r.intervalMs),
+      setInterval(() => {
+        void this.tick(r.id).catch((err: unknown) => {
+          // Defensive: tick's internal try/finally covers the run itself;
+          // this only catches pre-try throws so the scheduler never leaks an
+          // unhandled rejection every interval. Observability only.
+          console.error(`[dw] routine ${r.id} tick failed:`, err);
+        });
+      }, r.intervalMs),
     );
   }
 

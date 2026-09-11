@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { GraphStore } from './graphStore';
 import { PtyManager } from './ptyManager';
+import * as processTree from './processTree';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -100,4 +101,57 @@ describe('PtyManager spawn-time role ordering', () => {
     }
     expect(text).toContain('Dogwalker role was updated');
   }, 10_000);
+});
+
+// ── safety net: the memory poller must never become an unhandled rejection
+// source. listProcesses() normally resolves [] on error, but a rejection
+// anywhere in checkMemory (e.g. a throwing process-tree implementation) must
+// be logged by the interval's defensive catch — never leak.
+describe('PtyManager memory poller safety net', () => {
+  let dir = '';
+  let graph: GraphStore;
+  let ptys: PtyManager;
+  let term = '';
+
+  const webContents = {
+    send: () => {},
+    isDestroyed: () => false,
+  } as unknown as ConstructorParameters<typeof PtyManager>[0];
+
+  beforeAll(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dw-pty-mem-'));
+    graph = new GraphStore();
+    ptys = new PtyManager(webContents, graph, { socketPath: dir, shimDir: dir });
+    term = ptys.spawn({
+      preset: 'shell', name: 'mem-term', stableId: 'mem-term',
+      cols: 80, rows: 24, workspaceId: 'mem', floorName: 'ground', cwd: dir,
+    }).id;
+  });
+
+  afterAll(async () => {
+    ptys.killAll();
+    await wait(200);
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
+
+  it('logs instead of leaking a rejection when a memory poll fails', async () => {
+    ptys.setMemoryLimit(term, 256); // starts the 5s poller
+    const procSpy = vi.spyOn(processTree, 'listProcesses').mockRejectedValue(new Error('ps boom'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await wait(6_500); // one real poll cycle (5s interval)
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[dw] memory check failed'),
+        expect.any(Error),
+      );
+    } finally {
+      procSpy.mockRestore();
+      errSpy.mockRestore();
+      ptys.setMemoryLimit(term, 0); // stops the poller
+    }
+  }, 30_000);
 });

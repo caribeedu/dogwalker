@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -64,5 +64,28 @@ describe('RoutineService (integration, real PTY)', () => {
     await expect(routines.runNow(routine.id)).resolves.toBeUndefined();
     expect(routines.list('rt').find((r) => r.id === routine.id)?.status).toBe('paused');
     routines.remove(routine.id);
+  }, 30_000);
+
+  it('logs instead of leaking a rejection when a tick throws before its internal try', async () => {
+    // onUpdate fires before tick's internal try; a throw there rejects the
+    // tick. The interval's defensive catch must log it, never surface an
+    // unhandled rejection (which vitest would fail the suite on).
+    const boomTerm = ptys.spawn({ preset: 'shell', cols: 80, rows: 24, workspaceId: 'rt', stableId: 'boom-term', cwd: '', name: 'boom-term' }).id;
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const throwing = new RoutineService(dir, ptys, () => { throw new Error('onUpdate boom'); });
+    try {
+      const routine = throwing.create('rt', {
+        name: 'boom', targetStableId: 'boom-term', prompt: 'echo X', intervalMs: 5_000,
+      });
+      await wait(6_500); // one real interval cycle (5s min)
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`[dw] routine ${routine.id} tick failed`),
+        expect.any(Error),
+      );
+    } finally {
+      throwing.disposeAll();
+      ptys.kill(boomTerm);
+      errSpy.mockRestore();
+    }
   }, 30_000);
 });

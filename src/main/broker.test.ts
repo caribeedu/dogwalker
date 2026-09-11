@@ -303,6 +303,7 @@ describe('Broker (unit, stub deps)', () => {
   const injected: Array<{ to: string; body: string }> = [];
   const awaited: Array<{ to: string; timeoutMs: number }> = [];
   const slowTargets = new Set<string>();
+  const failingTargets = new Set<string>();
   const rolloverTargets = new Set<string>();
   const spawned: Array<Record<string, unknown>> = [];
   const killed: string[] = [];
@@ -318,6 +319,9 @@ describe('Broker (unit, stub deps)', () => {
       // isolates just the new output — exactly like the real PTY mirror.
       awaitQuiet: async (id: string, timeoutMs: number) => {
         awaited.push({ to: id, timeoutMs });
+        // A peer whose quiet-wait explodes: the exchange throws mid-ask, so
+        // handleAsk's Promise.all rejects — the dispatch catch must answer.
+        if (failingTargets.has(id)) throw new Error('exchange exploded');
         if (slowTargets.has(id)) await new Promise((r) => setTimeout(r, 400));
         const answer = answers.get(id);
         if (answer) captured.set(id, (captured.get(id) ?? '') + answer);
@@ -387,6 +391,7 @@ describe('Broker (unit, stub deps)', () => {
     answers.clear();
     captured.clear();
     slowTargets.clear();
+    failingTargets.clear();
     rolloverTargets.clear();
     injected.length = 0;
     awaited.length = 0;
@@ -501,6 +506,16 @@ describe('Broker (unit, stub deps)', () => {
   it('asks nothing when there is no target and all is unset', async () => {
     const res = await rpc(sock, { cmd: 'ask', from: 'lead', body: 'x' });
     expect(res).toEqual({ ok: false, error: 'ask needs a terminal target' });
+  });
+
+  it('answers the socket when an ask explodes mid-exchange', async () => {
+    // The exchange throws for this peer, so handleAsk's internal Promise.all
+    // rejects; the dispatch catch must answer the socket instead of leaking
+    // an unhandled rejection.
+    addTerminal('peer1', 'Peer One');
+    failingTargets.add('peer1');
+    const res = await rpc(sock, { cmd: 'ask', from: 'lead', target: 'Peer One', body: 'hi' });
+    expect(res).toEqual({ ok: false, error: 'exchange exploded' });
   });
 
   it('broadcasts to explicit targets with a broadcast id', async () => {
@@ -640,6 +655,15 @@ describe('Broker (unit, stub deps)', () => {
     portals.navigate.mockImplementationOnce(() => { throw new Error('boom'); });
     const res = await rpc(sock, { cmd: 'portal', from: 'lead', op: 'navigate', target: 'p1', arg: 'https://x' });
     expect(res).toEqual({ ok: false, error: 'boom' });
+  });
+
+  it('answers the socket when portal op=new throws outside the internal try', async () => {
+    // The `new` branch runs before handlePortal's internal try; a throw there
+    // must be answered by the dispatch catch, not leaked as an unhandled
+    // rejection.
+    portals.create.mockImplementationOnce(() => { throw new Error('portal factory exploded'); });
+    const res = await rpc(sock, { cmd: 'portal', from: 'lead', op: 'new', target: '', arg: 'https://x' });
+    expect(res).toEqual({ ok: false, error: 'portal factory exploded' });
   });
 
   it('portal read ops return their payloads', async () => {

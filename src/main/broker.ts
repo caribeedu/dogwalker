@@ -108,7 +108,11 @@ export class Broker {
     }
     switch (req.cmd) {
       case 'ask':
-        void this.handleAsk(socket, req);
+        // The internal Promise.all can reject (e.g. a PTY dies mid-ask);
+        // never leak that as an unhandled rejection — answer the terminal.
+        void this.handleAsk(socket, req).catch((err: unknown) => {
+          this.respond(socket, { ok: false, error: (err as Error).message });
+        });
         return;
       case 'check':
         return this.handleCheck(socket, req.from, req.target);
@@ -127,7 +131,11 @@ export class Broker {
           req.chain,
         );
       case 'portal':
-        void this.handlePortal(socket, req);
+        // Covers the residue outside handlePortal's internal try (op=new and
+        // the pre-try wiring); the internal try answers for its own ops.
+        void this.handlePortal(socket, req).catch((err: unknown) => {
+          this.respond(socket, { ok: false, error: (err as Error).message });
+        });
         return;
       case 'contract':
         return this.handleContract(socket, req);

@@ -41,6 +41,13 @@ if (started) {
   app.quit();
 }
 
+// Safety net — observability only, never recovery: rejections that escape the
+// local catches are logged, not swallowed or recovered. Local `.catch`
+// handling remains the real mechanism (hardening plan, Fase 4).
+process.on('unhandledRejection', (reason) => {
+  console.error('[dw] unhandledRejection:', reason);
+});
+
 let ptys: PtyManager | null = null;
 let broker: Broker | null = null;
 
