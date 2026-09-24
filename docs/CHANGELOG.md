@@ -3,6 +3,13 @@
 All notable changes, newest first. Dogwalker is a free, local, cross-platform
 canvas for AI coding agents.
 
+## 1.5.5
+
+- Fix: packaged app no longer dies before the UI loads because
+  `app.asar/src/shim/shim.mjs` was missing. The Forge Vite plugin only packs
+  `/.vite`; packaging now copies `src/shim` (and the agent skill) into the asar
+  so `createShimDir` can find the CLI shim.
+
 ## 1.5.4
 
 - Fix: `npm start` no longer fails PTY spawn with `posix_spawnp failed`. npm
